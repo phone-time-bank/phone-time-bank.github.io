@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>폰 시간 통장</title>
+<meta name="description" content="휴대폰을 안 쓴 시간만큼만 쓸 수 있어요. 설치·가입 없이 링크로 바로 시작.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="폰 시간 통장 — 안 쓴 만큼만 쓰기">
+<meta property="og:description" content="휴대폰을 안 쓴 시간만큼만 쓸 수 있어요. 설치·가입 없이 링크로 바로 시작."><style>
+  :root {
+    --bg: #f6f6f4;
+    --fg: #1b1b1b;
+    --muted: #6b6b6b;
+    --faint: #a3a3a3;
+    --accent: #1f9d55;
+    --btn-off: #2b2b2b;
+    --btn-text: #ffffff;
+    --disabled: #d4d4d0;
+    --disabled-text: #8a8a86;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111312;
+      --fg: #f1f1ef;
+      --muted: #a0a3a1;
+      --faint: #6a6d6b;
+      --accent: #2fbf6c;
+      --btn-off: #e9e9e6;
+      --btn-text: #111312;
+      --disabled: #2a2d2b;
+      --disabled-text: #6a6d6b;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+    overflow: hidden;
+  }
+  main {
+    height: 100vh;
+    height: 100dvh;
+    max-width: 480px;
+    margin: 0 auto;
+    padding: calc(20px + env(safe-area-inset-top)) 20px calc(12px + env(safe-area-inset-bottom));
+    display: flex;
+    flex-direction: column;
+    text-align: center;
+  }
+  #status { font-size: 20px; font-weight: 600; }
+  .center {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 16px;
+  }
+  #time {
+    font-size: clamp(72px, 26vw, 128px);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+  body.active #time, body.active #status { color: var(--accent); }
+  #desc {
+    margin: 0 auto;
+    max-width: 320px;
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--muted);
+    word-break: keep-all;
+  }
+  #toggle {
+    width: 100%;
+    height: 76px;
+    border: 0;
+    border-radius: 20px;
+    font-size: 26px;
+    font-weight: 700;
+    color: #fff;
+    background: var(--accent);
+    touch-action: manipulation;
+    cursor: pointer;
+  }
+  body.active #toggle { background: var(--btn-off); color: var(--btn-text); }
+  #toggle:disabled { background: var(--disabled); color: var(--disabled-text); cursor: default; }
+  #stats { margin-top: 14px; font-size: 13px; color: var(--muted); }
+  #reset {
+    margin: 8px auto 0;
+    padding: 6px 10px;
+    border: 0;
+    background: none;
+    font-size: 11px;
+    color: var(--faint);
+    text-decoration: underline;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+<main>
+  <div id="status">🔒 적립 중</div>
+  <div class="center">
+    <div id="time">00:00</div>
+    <p id="desc"></p>
+  </div>
+  <button id="toggle" type="button">ON</button>
+  <div id="stats"></div>
+  <button id="reset" type="button">초기화</button>
+</main>
+
+<script src="logic.js"></script>
+<script>
+  const KEY = 'phone-time-bank-v1';
+  const LOCKED_DESC = '휴대폰을 안 쓴 만큼 쓸 수 있어요 (최대 30분)';
+  const ACTIVE_DESC = '0이 되면 내려놓으세요. 다른 앱에선 알림이 안 오니 기본 타이머 앱에 같은 시간을 맞춰두세요.';
+
+  const speedParam = Number(new URLSearchParams(location.search).get('speed'));
+  const speed = speedParam > 0 ? speedParam : 1;
+
+  const $ = (id) => document.getElementById(id);
+
+  // 탭이 여러 개 열려 있어도 어긋나지 않도록 항상 저장값을 기준으로 계산한다.
+  function load() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(KEY));
+      if (saved && typeof saved.lastTs === 'number') return saved;
+    } catch (e) {}
+    return null;
+  }
+
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {}
+  }
+
+  function render() {
+    const active = s.state === 'ACTIVE';
+    document.body.classList.toggle('active', active);
+    $('status').textContent = active ? '🟢 사용 중' : '🔒 적립 중';
+    $('time').textContent = formatMMSS(active ? Math.ceil(s.bankSec) : Math.floor(s.bankSec));
+    $('desc').textContent = active ? ACTIVE_DESC : LOCKED_DESC;
+    $('toggle').textContent = active ? 'OFF' : 'ON';
+    $('toggle').disabled = !active && !canTurnOn(s);
+    const h = Math.floor(s.usedSec / 3600);
+    const m = Math.floor((s.usedSec % 3600) / 60);
+    $('stats').textContent = `${dayCount(s.startTs, Date.now())}일째 · ON ${s.onCount}회 · 총 사용 ${h}시간 ${m}분`;
+  }
+
+  function tick() {
+    s = applyElapsed(load() || s, Date.now(), speed);
+    save();
+    render();
+  }
+
+  let s = load() || createState(Date.now());
+  tick();
+  setInterval(tick, 1000);
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') tick();
+  });
+
+  $('toggle').addEventListener('click', () => {
+    const now = Date.now();
+    s = load() || s;
+    s = s.state === 'ACTIVE' ? turnOff(s, now, speed) : turnOn(s, now, speed);
+    save();
+    render();
+  });
+
+  $('reset').addEventListener('click', () => {
+    if (!confirm('모든 기록을 지우고 처음부터 시작할까요?')) return;
+    try { localStorage.removeItem(KEY); } catch (e) {}
+    s = createState(Date.now());
+    save();
+    render();
+  });
+</script>
+</body>
+</html>
