@@ -8,12 +8,14 @@
 <meta name="description" content="휴대폰을 안 쓴 시간만큼만 쓸 수 있어요. 설치·가입 없이 링크로 바로 시작.">
 <meta property="og:type" content="website">
 <meta property="og:title" content="폰 시간 통장 — 안 쓴 만큼만 쓰기">
-<meta property="og:description" content="휴대폰을 안 쓴 시간만큼만 쓸 수 있어요. 설치·가입 없이 링크로 바로 시작."><style>
+<meta property="og:description" content="휴대폰을 안 쓴 시간만큼만 쓸 수 있어요. 설치·가입 없이 링크로 바로 시작.">
+<style>
   :root {
     --bg: #f6f6f4;
     --fg: #1b1b1b;
     --muted: #6b6b6b;
     --faint: #a3a3a3;
+    --card: #e9e9e5;
     --accent: #1f9d55;
     --btn-off: #2b2b2b;
     --btn-text: #ffffff;
@@ -26,6 +28,7 @@
       --fg: #f1f1ef;
       --muted: #a0a3a1;
       --faint: #6a6d6b;
+      --card: #1f2321;
       --accent: #2fbf6c;
       --btn-off: #e9e9e6;
       --btn-text: #111312;
@@ -75,7 +78,8 @@
     color: var(--muted);
     word-break: keep-all;
   }
-  #toggle {
+  .big {
+    flex: none;
     width: 100%;
     height: 76px;
     border: 0;
@@ -90,28 +94,111 @@
   body.active #toggle { background: var(--btn-off); color: var(--btn-text); }
   #toggle:disabled { background: var(--disabled); color: var(--disabled-text); cursor: default; }
   #stats { margin-top: 14px; font-size: 13px; color: var(--muted); }
-  #reset {
-    margin: 8px auto 0;
+  .links { margin-top: 8px; font-size: 11px; color: var(--faint); }
+  .links button {
     padding: 6px 10px;
     border: 0;
     background: none;
-    font-size: 11px;
-    color: var(--faint);
+    font: inherit;
+    color: inherit;
     text-decoration: underline;
     cursor: pointer;
+  }
+
+  /* 첫 방문 사용법 */
+  #intro {
+    position: fixed;
+    top: 0; right: 0; bottom: 0; left: 0;
+    z-index: 1;
+    background: var(--bg);
+  }
+  #intro[hidden] { display: none; }
+  .intro-inner {
+    height: 100%;
+    max-width: 480px;
+    margin: 0 auto;
+    padding: calc(28px + env(safe-area-inset-top)) 20px calc(20px + env(safe-area-inset-bottom));
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  .intro-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  #intro h1 { margin: 0; font-size: 28px; line-height: 1.3; word-break: keep-all; }
+  .lead { margin: 10px 0 28px; font-size: 16px; line-height: 1.5; color: var(--muted); word-break: keep-all; }
+  .steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 18px; }
+  .steps li { display: flex; gap: 14px; align-items: flex-start; }
+  .icon {
+    flex: none;
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    background: var(--card);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+  }
+  .steps b { display: block; margin-bottom: 3px; font-size: 17px; }
+  .steps p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--muted); word-break: keep-all; }
+  #intro .big { margin-top: 24px; }
+  @media (max-height: 620px) {
+    #intro h1 { font-size: 24px; }
+    .lead { margin: 6px 0 18px; font-size: 15px; }
+    .steps { gap: 12px; }
+    #intro .big { margin-top: 16px; height: 64px; font-size: 22px; }
   }
 </style>
 </head>
 <body>
+<div id="intro" role="dialog" aria-modal="true" aria-labelledby="intro-title" hidden>
+  <div class="intro-inner">
+    <div class="intro-body">
+      <h1 id="intro-title">안 쓴 만큼만<br>쓸 수 있는 폰</h1>
+      <p class="lead">폰을 내려놓으면 시간이 쌓이고,<br>쌓인 만큼만 쓸 수 있어요.</p>
+      <ol class="steps">
+        <li>
+          <span class="icon" aria-hidden="true">🔒</span>
+          <div><b>내려놓으면 쌓여요</b><p>안 쓴 1초 = 쓸 수 있는 1초 (최대 30분). 이 창을 닫아도 계속 쌓여요.</p></div>
+        </li>
+        <li>
+          <span class="icon" aria-hidden="true">🟢</span>
+          <div><b>쓰기 전에 ON</b><p>1분 이상 모이면 켤 수 있어요. 일찍 끝나면 OFF, 남은 시간은 그대로예요.</p></div>
+        </li>
+        <li>
+          <span class="icon" aria-hidden="true">⏰</span>
+          <div><b>0이 되면 내려놓기</b><p>다른 앱에선 알림이 없어요. 기본 타이머 앱에 같은 시간을 맞춰두세요.</p></div>
+        </li>
+      </ol>
+    </div>
+    <button id="intro-start" class="big" type="button">시작하기</button>
+  </div>
+</div>
+<script>
+  // 화면이 그려지기 전에 결정해서, 첫 방문 때 메인 화면이 먼저 번쩍이지 않게 한다.
+  const INTRO_KEY = 'phone-time-bank-intro-seen';
+  try {
+    if (localStorage.getItem(INTRO_KEY) !== '1') document.getElementById('intro').hidden = false;
+  } catch (e) {
+    document.getElementById('intro').hidden = false;
+  }
+</script>
+
 <main>
   <div id="status">🔒 적립 중</div>
   <div class="center">
     <div id="time">00:00</div>
     <p id="desc"></p>
   </div>
-  <button id="toggle" type="button">ON</button>
+  <button id="toggle" class="big" type="button">ON</button>
   <div id="stats"></div>
-  <button id="reset" type="button">초기화</button>
+  <div class="links">
+    <button id="help" type="button">사용법</button> · <button id="reset" type="button">초기화</button>
+  </div>
 </main>
 
 <script src="logic.js"></script>
@@ -171,6 +258,15 @@
     s = s.state === 'ACTIVE' ? turnOff(s, now, speed) : turnOn(s, now, speed);
     save();
     render();
+  });
+
+  $('intro-start').addEventListener('click', () => {
+    try { localStorage.setItem(INTRO_KEY, '1'); } catch (e) {}
+    $('intro').hidden = true;
+  });
+
+  $('help').addEventListener('click', () => {
+    $('intro').hidden = false;
   });
 
   $('reset').addEventListener('click', () => {
